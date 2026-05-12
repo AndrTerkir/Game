@@ -63,17 +63,17 @@ void drawMap()
             {
                 switch (map[y][x])
                 {
-                    case 0:
-                        cout << ". ";
-                        break;
+                case 0:
+                    cout << ". ";
+                    break;
 
-                    case 1:
-                        cout << "# ";
-                        break;
+                case 1:
+                    cout << "# ";
+                    break;
 
-                    case 2:
-                        cout << "~ ";
-                        break;
+                case 2:
+                    cout << "~ ";
+                    break;
                 }
             }
         }
@@ -82,6 +82,7 @@ void drawMap()
     }
 
     cout << endl;
+    setlocale(LC_ALL, "Rus");
     cout << "Управление: стрелочки" << endl;
 }
 
@@ -109,21 +110,21 @@ int main()
 
             switch (key)
             {
-                case 72:
-                    newY--;
-                    break;
+            case 72:
+                newY--;
+                break;
 
-                case 80:
-                    newY++;
-                    break;
+            case 80:
+                newY++;
+                break;
 
-                case 75:
-                    newX--;
-                    break;
+            case 75:
+                newX--;
+                break;
 
-                case 77:
-                    newX++;
-                    break;
+            case 77:
+                newX++;
+                break;
             }
 
             if (canMove(newX, newY))
