@@ -2,24 +2,25 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <chrono>
 
 using namespace std;
 
-const int screenWidth = 320;
-const int screenHeight = 120;
+const int SCREEN_WIDTH = 240;
+const int SCREEN_HEIGHT = 80;
 
-const int mapWidth = 16;
-const int mapHeight = 16;
+const int MAP_WIDTH = 16;
+const int MAP_HEIGHT = 16;
 
 float playerX = 3.0f;
 float playerY = 3.0f;
 float playerA = 0.0f;
 
 float FOV = 3.14159f / 4.0f;
-float depth = 16.0f;
-float speed = 5.0f;
+float DEPTH = 16.0f;
+float SPEED = 5.0f;
 
-wstring map;
+wstring mapData;
 
 struct Enemy
 {
@@ -31,13 +32,36 @@ struct Enemy
 vector<Enemy> enemies =
 {
     {8.0f, 8.0f, true},
-    {10.0f, 13.0f, true},
-    {13.0f, 5.0f, true}
+    {12.0f, 10.0f, true},
+    {6.0f, 13.0f, true}
 };
 
 bool IsWall(float x, float y)
 {
-    return map[(int)y * mapWidth + (int)x] == '#';
+    if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT)
+        return true;
+
+    return mapData[(int)y * MAP_WIDTH + (int)x] == '#';
+}
+
+void InitMap()
+{
+    mapData += L"################";
+    mapData += L"#..............#";
+    mapData += L"#....######....#";
+    mapData += L"#..............#";
+    mapData += L"#..####........#";
+    mapData += L"#..............#";
+    mapData += L"#......####....#";
+    mapData += L"#..............#";
+    mapData += L"#....#.........#";
+    mapData += L"#....#.........#";
+    mapData += L"#....#####.....#";
+    mapData += L"#..............#";
+    mapData += L"#......##......#";
+    mapData += L"#..............#";
+    mapData += L"#............X.#";
+    mapData += L"################";
 }
 
 void Shoot()
@@ -50,13 +74,18 @@ void Shoot()
         float dx = e.x - playerX;
         float dy = e.y - playerY;
 
-        float distance = sqrt(dx * dx + dy * dy);
+        float dist = sqrt(dx * dx + dy * dy);
 
         float angle = atan2(dy, dx);
 
-        float diff = fabs(playerA - angle);
+        float diff = fabs(angle - playerA);
 
-        if (diff < 0.15f && distance < 8.0f)
+        while (diff > 3.14159f)
+            diff -= 6.28318f;
+
+        diff = fabs(diff);
+
+        if (diff < 0.12f && dist < 10.0f)
         {
             e.alive = false;
         }
@@ -65,24 +94,9 @@ void Shoot()
 
 int main()
 {
-    map += L"################";
-    map += L"#..............#";
-    map += L"#..............#";
-    map += L"#.....####.....#";
-    map += L"#..............#";
-    map += L"#......#.......#";
-    map += L"#......#.......#";
-    map += L"#......#.......#";
-    map += L"#..............#";
-    map += L"#....#####.....#";
-    map += L"#..............#";
-    map += L"#..............#";
-    map += L"#......##......#";
-    map += L"#..............#";
-    map += L"#............X.#";
-    map += L"################";
+    InitMap();
 
-    wchar_t* screen = new wchar_t[screenWidth * screenHeight];
+    wchar_t* screen = new wchar_t[SCREEN_WIDTH * SCREEN_HEIGHT];
 
     HANDLE console = CreateConsoleScreenBuffer(
         GENERIC_READ | GENERIC_WRITE,
@@ -96,237 +110,227 @@ int main()
 
     DWORD bytesWritten = 0;
 
-    auto tp1 = chrono::system_clock::now();
+    vector<float> depthBuffer(SCREEN_WIDTH);
+
+    auto tp1 = chrono::high_resolution_clock::now();
 
     while (true)
     {
-        auto tp2 = chrono::system_clock::now();
-        chrono::duration<float> elapsedTime = tp2 - tp1;
+        auto tp2 = chrono::high_resolution_clock::now();
+        chrono::duration<float> elapsed = tp2 - tp1;
         tp1 = tp2;
 
-        float dt = elapsedTime.count();
+        float dt = elapsed.count();
 
-        // INPUT
+        if (GetAsyncKeyState('A') & 0x8000)
+            playerA -= 1.8f * dt;
 
-        if (GetAsyncKeyState((unsigned short)'A') & 0x8000)
-            playerA -= 1.5f * dt;
+        if (GetAsyncKeyState('D') & 0x8000)
+            playerA += 1.8f * dt;
 
-        if (GetAsyncKeyState((unsigned short)'D') & 0x8000)
-            playerA += 1.5f * dt;
+        float moveStep = SPEED * dt;
 
-        float moveStep = speed * dt;
-
-        if (GetAsyncKeyState((unsigned short)'W') & 0x8000)
+        if (GetAsyncKeyState('W') & 0x8000)
         {
-            playerX += sinf(playerA) * moveStep;
-            playerY += cosf(playerA) * moveStep;
+            float nx = playerX + sinf(playerA) * moveStep;
+            float ny = playerY + cosf(playerA) * moveStep;
 
-            if (IsWall(playerX, playerY))
+            if (!IsWall(nx, ny))
             {
-                playerX -= sinf(playerA) * moveStep;
-                playerY -= cosf(playerA) * moveStep;
+                playerX = nx;
+                playerY = ny;
             }
         }
 
-        if (GetAsyncKeyState((unsigned short)'S') & 0x8000)
+        if (GetAsyncKeyState('S') & 0x8000)
         {
-            playerX -= sinf(playerA) * moveStep;
-            playerY -= cosf(playerA) * moveStep;
+            float nx = playerX - sinf(playerA) * moveStep;
+            float ny = playerY - cosf(playerA) * moveStep;
 
-            if (IsWall(playerX, playerY))
+            if (!IsWall(nx, ny))
             {
-                playerX += sinf(playerA) * moveStep;
-                playerY += cosf(playerA) * moveStep;
+                playerX = nx;
+                playerY = ny;
             }
         }
 
         if (GetAsyncKeyState(VK_SPACE) & 0x0001)
             Shoot();
 
-        // RENDER
+        for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
+            screen[i] = ' ';
 
-        for (int x = 0; x < screenWidth; x++)
+        for (int x = 0; x < SCREEN_WIDTH; x++)
         {
             float rayAngle =
-                (playerA - FOV / 2.0f) +
-                ((float)x / (float)screenWidth) * FOV;
+                (playerA - FOV / 2.0f)
+                + ((float)x / (float)SCREEN_WIDTH) * FOV;
 
             float distanceToWall = 0.0f;
+
             bool hitWall = false;
 
             float eyeX = sinf(rayAngle);
             float eyeY = cosf(rayAngle);
 
-            while (!hitWall && distanceToWall < depth)
+            while (!hitWall && distanceToWall < DEPTH)
             {
-                distanceToWall += 0.05f;
+                distanceToWall += 0.03f;
 
                 int testX = (int)(playerX + eyeX * distanceToWall);
                 int testY = (int)(playerY + eyeY * distanceToWall);
 
-                if (testX < 0 || testX >= mapWidth ||
-                    testY < 0 || testY >= mapHeight)
+                if (testX < 0 || testX >= MAP_WIDTH ||
+                    testY < 0 || testY >= MAP_HEIGHT)
                 {
                     hitWall = true;
-                    distanceToWall = depth;
+                    distanceToWall = DEPTH;
                 }
-                else
+                else if (mapData[testY * MAP_WIDTH + testX] == '#')
                 {
-                    if (map[testY * mapWidth + testX] == '#')
-                    {
-                        hitWall = true;
-                    }
+                    hitWall = true;
                 }
             }
 
+            depthBuffer[x] = distanceToWall;
+
             int ceiling =
-                (float)(screenHeight / 2.0)
-                - screenHeight / ((float)distanceToWall);
+                (SCREEN_HEIGHT / 2.0)
+                - SCREEN_HEIGHT / distanceToWall;
 
-            int floor = screenHeight - ceiling;
+            int floor = SCREEN_HEIGHT - ceiling;
 
-            short shade = ' ';
+            wchar_t shade;
 
-            if (distanceToWall <= depth / 4.0f)
+            if (distanceToWall <= DEPTH / 4.0f)
                 shade = 0x2588;
-            else if (distanceToWall < depth / 3.0f)
+            else if (distanceToWall < DEPTH / 3.0f)
                 shade = 0x2593;
-            else if (distanceToWall < depth / 2.0f)
+            else if (distanceToWall < DEPTH / 2.0f)
                 shade = 0x2592;
-            else if (distanceToWall < depth)
+            else if (distanceToWall < DEPTH)
                 shade = 0x2591;
             else
                 shade = ' ';
 
-            for (int y = 0; y < screenHeight; y++)
+            for (int y = 0; y < SCREEN_HEIGHT; y++)
             {
-                if (y <= ceiling)
+                if (y < ceiling)
                 {
-                    screen[y * screenWidth + x] = ' ';
+                    screen[y * SCREEN_WIDTH + x] = ' ';
                 }
-                else if (y > ceiling && y <= floor)
+                else if (y >= ceiling && y <= floor)
                 {
-                    screen[y * screenWidth + x] = shade;
+                    screen[y * SCREEN_WIDTH + x] = shade;
                 }
                 else
                 {
-                    float b =
-                        1.0f -
-                        (((float)y - screenHeight / 2.0f)
-                        / ((float)screenHeight / 2.0f));
+                    float b = 1.0f -
+                        (((float)y - SCREEN_HEIGHT / 2.0f)
+                        / ((float)SCREEN_HEIGHT / 2.0f));
+
+                    wchar_t floorShade;
 
                     if (b < 0.25)
-                        shade = '#';
+                        floorShade = '#';
                     else if (b < 0.5)
-                        shade = 'x';
+                        floorShade = 'x';
                     else if (b < 0.75)
-                        shade = '.';
+                        floorShade = '.';
                     else if (b < 0.9)
-                        shade = '-';
+                        floorShade = '-';
                     else
-                        shade = ' ';
+                        floorShade = ' ';
 
-                    screen[y * screenWidth + x] = shade;
+                    screen[y * SCREEN_WIDTH + x] = floorShade;
                 }
             }
         }
-
-        // DRAW ENEMIES
 
         for (auto& e : enemies)
         {
             if (!e.alive)
                 continue;
 
-            float dx = e.x - playerX;
-            float dy = e.y - playerY;
+            float vecX = e.x - playerX;
+            float vecY = e.y - playerY;
 
-            float distance = sqrt(dx * dx + dy * dy);
+            float distance = sqrt(vecX * vecX + vecY * vecY);
 
-            float angle =
-                atan2(dy, dx) - playerA;
+            float objectAngle = atan2(vecY, vecX) - playerA;
 
-            while (angle > 3.14159f)
-                angle -= 2.0f * 3.14159f;
+            while (objectAngle < -3.14159f)
+                objectAngle += 6.28318f;
 
-            while (angle < -3.14159f)
-                angle += 2.0f * 3.14159f;
+            while (objectAngle > 3.14159f)
+                objectAngle -= 6.28318f;
 
-            bool inFOV = fabs(angle) < FOV / 2.0f;
+            bool inFOV = fabs(objectAngle) < FOV / 2.0f;
 
-            if (inFOV && distance >= 0.5f)
+            if (inFOV && distance >= 0.5f && distance < DEPTH)
             {
                 int enemyCeiling =
-                    (float)(screenHeight / 2.0)
-                    - screenHeight / distance;
+                    (float)(SCREEN_HEIGHT / 2.0)
+                    - SCREEN_HEIGHT / distance;
 
-                int enemyFloor =
-                    screenHeight - enemyCeiling;
+                int enemyFloor = SCREEN_HEIGHT - enemyCeiling;
 
-                int enemyHeight =
-                    enemyFloor - enemyCeiling;
+                int enemyHeight = enemyFloor - enemyCeiling;
+                int enemyWidth = enemyHeight / 2;
 
-                int enemyAspectWidth =
-                    enemyHeight / 2;
+                int middleX =
+                    (0.5f * (objectAngle / (FOV / 2.0f)) + 0.5f)
+                    * (float)SCREEN_WIDTH;
 
-                int middle =
-                    (0.5f * (angle / (FOV / 2.0f)) + 0.5f)
-                    * (float)screenWidth;
-
-                for (int ex = 0; ex < enemyAspectWidth; ex++)
+                for (int ex = 0; ex < enemyWidth; ex++)
                 {
-                    for (int ey = 0; ey < enemyHeight; ey++)
+                    int drawX = middleX + ex - enemyWidth / 2;
+
+                    if (drawX >= 0 && drawX < SCREEN_WIDTH)
                     {
-                        int drawX =
-                            middle + ex - enemyAspectWidth / 2;
-
-                        int drawY =
-                            enemyCeiling + ey;
-
-                        if (drawX >= 0 &&
-                            drawX < screenWidth &&
-                            drawY >= 0 &&
-                            drawY < screenHeight)
+                        if (depthBuffer[drawX] >= distance)
                         {
-                            screen[drawY * screenWidth + drawX] = 'M';
+                            for (int ey = 0; ey < enemyHeight; ey++)
+                            {
+                                int drawY = enemyCeiling + ey;
+
+                                if (drawY >= 0 && drawY < SCREEN_HEIGHT)
+                                {
+                                    screen[drawY * SCREEN_WIDTH + drawX] = 'M';
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // CROSSHAIR
+        screen[(SCREEN_HEIGHT / 2) * SCREEN_WIDTH + SCREEN_WIDTH / 2] = '+';
 
-        screen[(screenHeight / 2) * screenWidth + screenWidth / 2] = '+';
-
-        // MINIMAP
-
-        for (int nx = 0; nx < mapWidth; nx++)
+        for (int mx = 0; mx < MAP_WIDTH; mx++)
         {
-            for (int ny = 0; ny < mapHeight; ny++)
+            for (int my = 0; my < MAP_HEIGHT; my++)
             {
-                screen[(ny + 1) * screenWidth + nx] =
-                    map[ny * mapWidth + nx];
+                screen[(my + 1) * SCREEN_WIDTH + mx] =
+                    mapData[my * MAP_WIDTH + mx];
             }
         }
 
-        screen[((int)playerY + 1) * screenWidth + (int)playerX] = 'P';
+        screen[((int)playerY + 1) * SCREEN_WIDTH + (int)playerX] = 'P';
 
-        // WIN
-
-        if (map[(int)playerY * mapWidth + (int)playerX] == 'X')
+        if (mapData[(int)playerY * MAP_WIDTH + (int)playerX] == 'X')
         {
             system("cls");
             cout << "YOU WIN!" << endl;
             break;
         }
 
-        screen[screenWidth * screenHeight - 1] = '\0';
+        screen[SCREEN_WIDTH * SCREEN_HEIGHT - 1] = '\0';
 
         WriteConsoleOutputCharacterW(
             console,
             screen,
-            screenWidth * screenHeight,
+            SCREEN_WIDTH * SCREEN_HEIGHT,
             {0, 0},
             &bytesWritten
         );
